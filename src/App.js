@@ -1,45 +1,56 @@
-import { Route, BrowserRouter, Routes, redirect, Navigate } from "react-router-dom";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.js';
-import { useCookies } from "react-cookie"
-
-import Home from "./components/Home";
-import Login from "./components/Login";
-import { useContext, useEffect } from "react";
-import { AppContext } from "./context/AppContext";
+import { useEffect, useState } from 'react';
+import { getPokemon } from './api/getPokemon';
+import PokemonList from './components/PokemonList';
+import Pagination from './components/Pagination';
 
 function App() {
-  const { token, dispatch }  = useContext(AppContext);
-  const [cookie] = useCookies(['jwt'])
+  const [pokemon, setPokemon] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState('https://pokeapi.co/api/v2/pokemon');
+  const [nextPageUrl, setNextPageUrl] = useState();
+  const [prevPageUrl, setPrevPageUrl] = useState();
 
   useEffect(() => {
-    const setToken = () => {
-      const { jwt } = cookie;
-      if (jwt) {
-        const token = {
-          token: jwt
-        }
-  
-        dispatch({
-          type: 'ADD_TOKEN',
-          payload: token
-        })
+    async function fetchData() {
+      setLoading(true)
+      let cancel
+
+      const data = {
+        url: currentPage
       }
-    };
-  
-    if (token === null) {
-      setToken();
+
+      const res = await getPokemon(data, cancel)
+      setNextPageUrl(res.next)
+      setPrevPageUrl(res.previous)
+      setPokemon(res.results.map(p => p.name))
+      setLoading(false);
+
+      return () => cancel()
     }
-  }, [dispatch, token, cookie]);
 
+    fetchData()
+  }, [currentPage])
 
+  function setNextPage() {
+    setCurrentPage(nextPageUrl);
+  }
+
+  function setPrevPage() {
+    setCurrentPage(prevPageUrl);
+  }
+
+  if (loading) {
+    return "Loading..."
+  }
 
   return (
     <>
-      <Routes>
-        <Route path="/" element={token ? <Home /> : <Navigate to="/account" />} />
-        <Route path="/account" element={!token ? <Login /> : <Navigate to="/" />} />
-      </Routes>
+      <PokemonList pokemon={pokemon} />
+      <Pagination
+        setNextPage={nextPageUrl ? setNextPage : null}
+        setPrevPage={prevPageUrl ? setPrevPage : null} />
     </>
   )
 }
